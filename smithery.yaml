@@ -1,0 +1,12 @@
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      sponsorWallet:
+        type: string
+        default: "0x267e548ab3444aa0a671914ac7c644306a6b90b4"
+        description: "Polygon USDC payout address"
+  commandFunction:
+    command: "python"
+    args: ["mcp_server.py"]
