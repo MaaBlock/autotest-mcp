@@ -1,0 +1,26 @@
+name: CI & Release
+
+on:
+  push:
+    branches: [ master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tools
+        run: pip install build pytest
+      - name: Test MCP Server Protocol
+        run: |
+          python -c "import mcp_server; assert hasattr(mcp_server, 'main')"
+          pytest
+      - name: Build Wheel & Source Dist
+        run: python -m build

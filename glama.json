@@ -1,0 +1,20 @@
+{
+  "$schema": "https://glama.ai/mcp/schema/v1.json",
+  "name": "autotest-mcp",
+  "displayName": "AutoTest AI",
+  "description": "Industrial-grade defensive unit test synthesis & code defense auditing for Cursor and Claude Desktop",
+  "homepage": "https://autotest-ai.sweet-possum.workers.dev",
+  "repository": "https://github.com/MaaBlock/autotest-mcp",
+  "license": "MIT",
+  "transport": "stdio",
+  "tags": [
+    "mcp",
+    "cursor",
+    "claude-desktop",
+    "testing",
+    "pytest",
+    "jest",
+    "defensive-programming",
+    "code-quality"
+  ]
+}

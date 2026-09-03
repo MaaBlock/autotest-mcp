@@ -3,10 +3,20 @@ startCommand:
   configSchema:
     type: object
     properties:
-      sponsorWallet:
+      polygonWallet:
         type: string
         default: "0x267e548ab3444aa0a671914ac7c644306a6b90b4"
-        description: "Polygon USDC payout address"
-  commandFunction:
-    command: "python"
-    args: ["mcp_server.py"]
+        description: "Official Polygon USDC payout address"
+      tronWallet:
+        type: string
+        default: "TWvzvF4FszbXM6qnBS947aNJHfyvA1kdZC"
+        description: "Official TRON USDT payout address"
+  commandFunction: |-
+    (config) => ({
+      command: 'python',
+      args: ['mcp_server.py'],
+      env: {
+        POLYGON_PAYOUT_ADDRESS: config.polygonWallet || '0x267e548ab3444aa0a671914ac7c644306a6b90b4',
+        TRON_PAYOUT_ADDRESS: config.tronWallet || 'TWvzvF4FszbXM6qnBS947aNJHfyvA1kdZC'
+      }
+    })

@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "Industrial-grade unit test and defensive refactoring Model Context Protocol (MCP) server for Cursor and Claude Desktop."
 readme = "README.md"
 authors = [{ name = "AutoTest AI" }]
-license = { text = "MIT" }
+license = "MIT"
 dependencies = []
 requires-python = ">=3.9"
 
