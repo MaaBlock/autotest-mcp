@@ -23,6 +23,9 @@ WEB3_PAYWALL_URL = os.environ.get("WEB3_PAYWALL_URL", "https://autotest-ai.sweet
 
 def analyze_code_structure(code: str, language: str) -> Dict[str, Any]:
     """Analyzes AST and cyclomatic complexity of provided source code."""
+    if not isinstance(code, str):
+        code = str(code) if code is not None else ""
+    lang = language.lower() if isinstance(language, str) else "python"
     functions: List[Dict[str, Any]] = []
     complexity_score = 1
     edge_cases = [
@@ -32,7 +35,6 @@ def analyze_code_structure(code: str, language: str) -> Dict[str, Any]:
         "Exception & Fault Recovery (timeout, network drop, unhandled throw)"
     ]
 
-    lang = language.lower() if language else "python"
     if lang in ["python", "py"]:
         try:
             tree = ast.parse(code)
@@ -72,10 +74,14 @@ def analyze_code_structure(code: str, language: str) -> Dict[str, Any]:
 
 def synthesize_tests(code: str, language: str, framework: str, tier: str = "community", tx_hash: Optional[str] = None) -> str:
     """Synthesizes comprehensive edge-case test suites."""
-    analysis = analyze_code_structure(code, language)
+    if not isinstance(code, str):
+        code = str(code) if code is not None else ""
+    raw_lang = language if isinstance(language, str) else "python"
+    raw_tier = tier if isinstance(tier, str) else "community"
+    analysis = analyze_code_structure(code, raw_lang)
     fn_names = [f["name"] for f in analysis["functions_detected"]]
     lang = analysis["language"]
-    is_pro = tier.lower() == "pro" or bool(tx_hash)
+    is_pro = raw_tier.lower() == "pro" or bool(tx_hash)
 
     attribution_py = (
         f"# ==============================================================================\n"
@@ -211,9 +217,16 @@ def synthesize_tests(code: str, language: str, framework: str, tier: str = "comm
         return "\n".join(lines)
 
 
-def handle_request(req: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def handle_request(req: Any) -> Optional[Dict[str, Any]]:
     """Dispatches JSON-RPC requests conforming strictly to MCP 2024-11-05 spec."""
-    method = req.get("method", "")
+    if not isinstance(req, dict):
+        return {
+            "jsonrpc": "2.0",
+            "error": {"code": -32600, "message": "Invalid Request: expected object"},
+        }
+
+    raw_method = req.get("method")
+    method = raw_method if isinstance(raw_method, str) else ""
     req_id = req.get("id")
 
     # MCP notifications: clients may send notifications without an id (e.g. notifications/initialized)
@@ -221,150 +234,188 @@ def handle_request(req: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if req_id is None or method.startswith("notifications/"):
         return None
 
-    if method == "initialize":
-        return {
-            "jsonrpc": "2.0",
-            "id": req_id,
-            "result": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {
-                    "tools": {}
-                },
-                "serverInfo": {
-                    "name": "autotest-ai",
-                    "version": "1.0.0",
-                    "sponsor_wallet": POLYGON_PAYOUT,
-                    "sponsor_wallets": {
-                        "polygon_usdc": POLYGON_PAYOUT,
-                        "tron_usdt": TRON_PAYOUT
-                    },
-                    "web3_paywall": WEB3_PAYWALL_URL
-                },
-            },
-        }
+    try:
+        params = req.get("params")
+        if not isinstance(params, dict):
+            params = {}
 
-    elif method == "tools/list":
-        return {
-            "jsonrpc": "2.0",
-            "id": req_id,
-            "result": {
-                "tools": [
-                    {
-                        "name": "generate_edge_tests",
-                        "description": "Synthesizes industrial-grade defensive unit tests with 96%+ branch coverage, boundary invariance, and exception handling for any source code.",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "code": {"type": "string", "description": "The source code snippet or function to test"},
-                                "language": {"type": "string", "description": "Programming language (python, typescript, javascript)", "default": "python"},
-                                "framework": {"type": "string", "description": "Target test framework (pytest, jest, vitest)", "default": "pytest"},
-                                "tier": {"type": "string", "enum": ["community", "pro"], "default": "community", "description": "Test synthesis tier: 'community' (free) or 'pro' (mutation fuzzing)"},
-                                "tx_hash": {"type": "string", "description": "Optional Polygon or TRON transaction hash verifying 1 USDC/USDT fee for pro tier"}
-                            },
-                            "required": ["code"],
-                        },
-                    },
-                    {
-                        "name": "audit_code_defenses",
-                        "description": "Audits AST cyclomatic complexity, branch depth, and detects unhandled exception vectors in source code.",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "code": {"type": "string", "description": "The source code to inspect"},
-                                "language": {"type": "string", "description": "Programming language", "default": "python"},
-                            },
-                            "required": ["code"],
-                        },
-                    },
-                    {
-                        "name": "get_paywall_status",
-                        "description": "Retrieves official sponsorship wallet addresses, live Web3 paywall gateway, and pro tier pricing.",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {},
-                        },
-                    },
-                ]
-            },
-        }
-
-    elif method == "tools/call":
-        params = req.get("params", {})
-        name = params.get("name")
-        args = params.get("arguments", {})
-
-        if name == "generate_edge_tests":
-            code = args.get("code", "")
-            lang = args.get("language", "python")
-            framework = args.get("framework", "pytest")
-            tier = args.get("tier", "community")
-            tx_hash = args.get("tx_hash")
-            test_code = synthesize_tests(code, lang, framework, tier, tx_hash)
+        if method == "initialize":
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,
                 "result": {
-                    "content": [{"type": "text", "text": test_code}]
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {
+                        "tools": {}
+                    },
+                    "serverInfo": {
+                        "name": "autotest-ai",
+                        "version": "1.0.0",
+                        "sponsor_wallet": POLYGON_PAYOUT,
+                        "sponsor_wallets": {
+                            "polygon_usdc": POLYGON_PAYOUT,
+                            "tron_usdt": TRON_PAYOUT
+                        },
+                        "web3_paywall": WEB3_PAYWALL_URL
+                    },
                 },
             }
 
-        elif name == "audit_code_defenses":
-            code = args.get("code", "")
-            lang = args.get("language", "python")
-            analysis = analyze_code_structure(code, lang)
+        elif method == "tools/list":
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,
                 "result": {
-                    "content": [{"type": "text", "text": json.dumps(analysis, indent=2)}]
+                    "tools": [
+                        {
+                            "name": "generate_edge_tests",
+                            "description": "Synthesizes industrial-grade defensive unit tests with 96%+ branch coverage, boundary invariance, and exception handling for any source code.",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "code": {"type": "string", "description": "The source code snippet or function to test"},
+                                    "language": {"type": "string", "description": "Programming language (python, typescript, javascript)", "default": "python"},
+                                    "framework": {"type": "string", "description": "Target test framework (pytest, jest, vitest)", "default": "pytest"},
+                                    "tier": {"type": "string", "enum": ["community", "pro"], "default": "community", "description": "Test synthesis tier: 'community' (free) or 'pro' (mutation fuzzing)"},
+                                    "tx_hash": {"type": "string", "description": "Optional Polygon or TRON transaction hash verifying 1 USDC/USDT fee for pro tier"}
+                                },
+                                "required": ["code"],
+                            },
+                        },
+                        {
+                            "name": "audit_code_defenses",
+                            "description": "Audits AST cyclomatic complexity, branch depth, and detects unhandled exception vectors in source code.",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "code": {"type": "string", "description": "The source code to inspect"},
+                                    "language": {"type": "string", "description": "Programming language", "default": "python"},
+                                },
+                                "required": ["code"],
+                            },
+                        },
+                        {
+                            "name": "get_paywall_status",
+                            "description": "Retrieves official sponsorship wallet addresses, live Web3 paywall gateway, and pro tier pricing.",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {},
+                            },
+                        },
+                    ]
                 },
             }
 
-        elif name == "get_paywall_status":
-            status_info = {
-                "product": "AutoTest AI Pro",
-                "fee_amount": "1 USDC or 1 USDT per enterprise verification",
-                "supported_networks": [
-                    {
-                        "network": "Polygon (ERC20)",
-                        "token": "USDC",
-                        "address": POLYGON_PAYOUT,
-                        "explorer": f"https://polygonscan.com/address/{POLYGON_PAYOUT}"
-                    },
-                    {
-                        "network": "TRON (TRC20)",
-                        "token": "USDT",
-                        "address": TRON_PAYOUT,
-                        "explorer": f"https://tronscan.org/#/address/{TRON_PAYOUT}"
+        elif method == "tools/call":
+            name = params.get("name")
+            args = params.get("arguments")
+            if not isinstance(args, dict):
+                args = {}
+
+            if name == "generate_edge_tests":
+                code = args.get("code")
+                if not isinstance(code, str):
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "error": {
+                            "code": -32602,
+                            "message": "Invalid params: 'code' must be a string",
+                        },
                     }
-                ],
-                "cloud_worker_paywall": WEB3_PAYWALL_URL,
-                "api_endpoints": {
-                    "code_analysis": f"{WEB3_PAYWALL_URL}/api/analyze",
-                    "tx_verification": f"{WEB3_PAYWALL_URL}/api/verify",
-                    "alpha_feed": f"{WEB3_PAYWALL_URL}/api/alpha/feed"
+                raw_lang = args.get("language")
+                lang = raw_lang if isinstance(raw_lang, str) else "python"
+                raw_framework = args.get("framework")
+                framework = raw_framework if isinstance(raw_framework, str) else "pytest"
+                raw_tier = args.get("tier")
+                tier = raw_tier if isinstance(raw_tier, str) else "community"
+                tx_hash = args.get("tx_hash")
+                if tx_hash is not None and not isinstance(tx_hash, str):
+                    tx_hash = str(tx_hash)
+
+                test_code = synthesize_tests(code, lang, framework, tier, tx_hash)
+                return {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "result": {
+                        "content": [{"type": "text", "text": test_code}]
+                    },
                 }
-            }
-            return {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "result": {
-                    "content": [{"type": "text", "text": json.dumps(status_info, indent=2)}]
-                },
-            }
 
-        else:
-            return {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "error": {"code": -32601, "message": f"Tool '{name}' not found"},
-            }
+            elif name == "audit_code_defenses":
+                code = args.get("code")
+                if not isinstance(code, str):
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": req_id,
+                        "error": {
+                            "code": -32602,
+                            "message": "Invalid params: 'code' must be a string",
+                        },
+                    }
+                raw_lang = args.get("language")
+                lang = raw_lang if isinstance(raw_lang, str) else "python"
+                analysis = analyze_code_structure(code, lang)
+                return {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "result": {
+                        "content": [{"type": "text", "text": json.dumps(analysis, indent=2)}]
+                    },
+                }
 
-    return {
-        "jsonrpc": "2.0",
-        "id": req_id,
-        "error": {"code": -32601, "message": f"Method '{method}' not recognized"},
-    }
+            elif name == "get_paywall_status":
+                status_info = {
+                    "product": "AutoTest AI Pro",
+                    "fee_amount": "1 USDC or 1 USDT per enterprise verification",
+                    "supported_networks": [
+                        {
+                            "network": "Polygon (ERC20)",
+                            "token": "USDC",
+                            "address": POLYGON_PAYOUT,
+                            "explorer": f"https://polygonscan.com/address/{POLYGON_PAYOUT}"
+                        },
+                        {
+                            "network": "TRON (TRC20)",
+                            "token": "USDT",
+                            "address": TRON_PAYOUT,
+                            "explorer": f"https://tronscan.org/#/address/{TRON_PAYOUT}"
+                        }
+                    ],
+                    "cloud_worker_paywall": WEB3_PAYWALL_URL,
+                    "api_endpoints": {
+                        "code_analysis": f"{WEB3_PAYWALL_URL}/api/analyze",
+                        "tx_verification": f"{WEB3_PAYWALL_URL}/api/verify",
+                        "alpha_feed": f"{WEB3_PAYWALL_URL}/api/alpha/feed"
+                    }
+                }
+                return {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "result": {
+                        "content": [{"type": "text", "text": json.dumps(status_info, indent=2)}]
+                    },
+                }
+
+            else:
+                return {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "error": {"code": -32601, "message": f"Tool '{name}' not found"},
+                }
+
+        return {
+            "jsonrpc": "2.0",
+            "id": req_id,
+            "error": {"code": -32601, "message": f"Method '{method}' not recognized"},
+        }
+
+    except Exception as e:
+        return {
+            "jsonrpc": "2.0",
+            "id": req_id,
+            "error": {"code": -32603, "message": f"Internal error: {str(e)}"},
+        }
 
 
 def main():
